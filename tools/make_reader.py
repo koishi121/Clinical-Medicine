@@ -169,14 +169,15 @@ def md_to_html(src, idmap):
 
 # ---------------- 收集条目 ----------------
 class Entry:
-    __slots__ = ("id", "title", "path", "suffix", "body_html")
+    __slots__ = ("id", "title", "path", "suffix", "body_html", "level")
 
-    def __init__(self, eid, title, path, suffix, body_html):
+    def __init__(self, eid, title, path, suffix, body_html, level=""):
         self.id = eid
         self.title = title
         self.path = path
         self.suffix = suffix
         self.body_html = body_html
+        self.level = level
 
 
 def collect(root, idmap):
@@ -185,10 +186,10 @@ def collect(root, idmap):
     counter = [0]
     idmap.update({})  # ensure
 
-    def add(title, path, body_html):
+    def add(title, path, body_html, level=""):
         counter[0] += 1
         r = rel(root, path)
-        e = Entry(counter[0], title, r, os.path.splitext(path)[1].lower(), body_html)
+        e = Entry(counter[0], title, r, os.path.splitext(path)[1].lower(), body_html, level)
         entries.append(e)
         idmap[norm(r)] = e.id
         return e
@@ -200,7 +201,9 @@ def collect(root, idmap):
         except (OSError, UnicodeDecodeError):
             return None
         t = title or os.path.splitext(os.path.basename(path))[0]
-        return add(t, path, md_to_html(src, idmap))
+        m = re.search(r">\s*大纲要求\s*:([^\n]*)", src)
+        lv = (m.group(1).strip() if m else "") or ""
+        return add(t, path, md_to_html(src, idmap), lv)
 
     def add_file(path, title=None):
         with open(path, encoding="utf-8") as f:
@@ -532,20 +535,37 @@ def build(root):
     tool_gids = [e.id for e in entries if e.path.replace("\\", "/").startswith("tools/")]
 
     # ---- 组装导航 ----
+    def lv_emoji(e):
+        if e.level.startswith("🔷"):
+            return "🔷"
+        if e.level.startswith("◽"):
+            return "◽"
+        return ""
+
     def group_html(title, gids):
         if not gids:
             return ""
         items = []
         for gid in gids:
             e = by_id[gid]
+            nm = (lv_emoji(e) + " " + e.title).strip() if lv_emoji(e) else e.title
             items.append(f'<a class="it" data-id="{e.id}" data-t="{esc(e.title + " " + e.path)}">'
-                         f'<span class="nm">{esc(e.title)}</span>'
+                         f'<span class="nm">{esc(nm)}</span>'
                          f'<span class="sub">{esc(e.path)}</span></a>')
         return (f'<div class="grp"><h3 class="h3">{esc(title)}'
                 f'<span class="cnt">{len(gids)}</span></h3>'
                 f'<div class="items">{"".join(items)}</div></div>')
 
     sections_html = []
+    # 📊 大纲要求(掌握/熟悉):置于最前,便于按优先度刷
+    lv_hi = [e.id for e in entries if e.level.startswith("🔷")]
+    lv_lo = [e.id for e in entries if e.level.startswith("◽")]
+    if lv_hi or lv_lo:
+        sections_html.append(
+            '<div class="secbox"><h2 class="sec">📊 大纲要求·掌握/熟悉<span class="sc"></span></h2>'
+            + group_html("🔷 掌握 · 重点病种(必刷)", lv_hi)
+            + group_html("◽ 熟悉 · 小众病种", lv_lo)
+            + "</div>")
     # 考试
     exam_groups = list(groups03)
     for unit in ["00_大纲与计划", "01_基础医学综合", "02_医学人文综合", "04_预防医学综合", "05_实践技能"]:
