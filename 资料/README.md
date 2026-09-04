@@ -15,5 +15,5 @@
 
 ## 个人笔记(可导入)
 
-- 桌面 OneNote《临床医学》旧笔记:因本机 OneNote COM 导出接口损坏,采用 **GUI 手动导出 MHT** 入库。
-  登记表(分区↔MHT↔正库对应)与步骤见 **[`旧笔记/README.md`](旧笔记/README.md)**,MHT 放到 `旧笔记\MHT\`。
+- 桌面 OneNote《临床医学》旧笔记:因本机 OneNote COM 导出接口损坏,采用 **GUI 临时导出 → HTML 单文件内嵌** 入库(20 分区全转,MHT 源已删)。
+  登记表与**考试×规培病种映射页**看 **[`旧笔记/README.md`](旧笔记/README.md)** 和 **[`旧笔记/index.html`](旧笔记/index.html)**。

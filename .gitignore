@@ -2,5 +2,3 @@ __pycache__/
 *.pyc
 .vs/
 .DS_Store
-# 旧笔记 MHT(二进制大文件,只登记不纳管)
-资料/旧笔记/MHT/
