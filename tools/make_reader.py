@@ -235,6 +235,9 @@ def collect(root, idmap):
     cp = os.path.join(root, "CONTEXT.md")
     if os.path.isfile(cp):
         add_md(cp, "📖 术语表 CONTEXT")
+    dp = os.path.join(root, "大纲导航.md")
+    if os.path.isfile(dp):
+        add_md(dp, "🧭 大纲导航(2026)")
 
     # 考试
     exam = os.path.join(root, "考试")
