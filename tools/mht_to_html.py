@@ -98,11 +98,11 @@ def main():
             imgmap[base] = f"assets/{base}"
         label = "external"
 
-    # 重写图片引用:file:/// C:/... file7919.files/xxx.png -> assets/xxx.png
+    # 重写图片引用:file:/// C:/... file7919.files/xxx.png -> assets/xxx.png 或 data URI
     def _rewrite(m):
-        token = m.group(2)
+        token = m.group(3)
         base = os.path.basename(token.replace("\\", "/"))
-        return m.group(1) + (imgmap.get(base) or token) + m.group(3)
+        return m.group(1) + m.group(2) + (imgmap.get(base) or token) + m.group(4)
 
     html = re.sub(r'(<img[^>]*\bsrc=)(["\'])([^"\']+)(["\'])', _rewrite, html, flags=re.I)
 
