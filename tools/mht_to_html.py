@@ -20,11 +20,25 @@ import re
 import sys
 
 BANNER_CSS = """
-.banner-note{background:#fff7e0;border:1px solid #f0ad4e;border-left:6px solid #f0ad4e;
- border-radius:6px;padding:12px 16px;margin:0 0 16px 0;font-family:system-ui,-apple-system,sans-serif;
- color:#7a4a00;}
-.banner-note b{color:#a05a00;}
-.banner-note code{background:#ffe9c7;padding:1px 4px;border-radius:3px;}
+.banner-note{background:#fdf3e3;border:1px solid #ead9b8;border-left:6px solid #e0a84e;
+ border-radius:8px;padding:12px 16px;margin:0 0 18px 0;font-family:system-ui,-apple-system,sans-serif;
+ color:#7a4a00;line-height:1.6;}
+.banner-note b{color:#9c6b1f;}
+.banner-note code{background:#f5e7cf;padding:1px 5px;border-radius:4px;}
+"""
+
+READ_CSS = """
+html,body{background:#faf6ee !important;color:#3f3f3f !important;
+ font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC",system-ui,-apple-system,"Segoe UI",sans-serif !important;
+ font-size:16px !important;line-height:1.9 !important;}
+body{max-width:1000px;margin:0 auto;padding:28px 40px 72px;}
+h1,h2,h3,h4{color:#7a5224;line-height:1.45;margin-top:1.4em;}
+p{margin:0.6em 0;}
+table{max-width:100%;border-collapse:collapse;margin:0.6em 0;}
+td,th{border:1px solid #e8dfcf !important;padding:7px 12px !important;
+ background:#fffdf8 !important;}
+img{max-width:100% !important;height:auto !important;border-radius:4px;}
+a{color:#8a5a2b;}
 """
 
 
@@ -121,7 +135,7 @@ def main():
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>📌 旧笔记 · {stem}</title>
-<style>{BANNER_CSS}</style>
+<style>{BANNER_CSS}{READ_CSS}</style>
 </head>
 <body>
 {banner}
