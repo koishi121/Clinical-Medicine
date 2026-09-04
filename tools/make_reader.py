@@ -557,14 +557,20 @@ def build(root):
                 f'<div class="items">{"".join(items)}</div></div>')
 
     sections_html = []
-    # 📊 大纲要求(掌握/熟悉):置于最前,便于按优先度刷
-    lv_hi = [e.id for e in entries if e.level.startswith("🔷")]
-    lv_lo = [e.id for e in entries if e.level.startswith("◽")]
-    if lv_hi or lv_lo:
+    # 📊 大纲要求·掌握优先(按系统):掌握卡多的系统排前,系统内🔷在前◽在后
+    sys_lv = []
+    for sysname, gids in groups03:
+        lv_gids = [g for g in gids if by_id[g].level]
+        if not lv_gids:
+            continue
+        hi_n = sum(1 for g in lv_gids if by_id[g].level.startswith("🔷"))
+        lv_gids.sort(key=lambda g: (0 if by_id[g].level.startswith("🔷") else 1, by_id[g].title))
+        sys_lv.append((sysname, hi_n, lv_gids))
+    sys_lv.sort(key=lambda x: (-x[1], x[0]))
+    if sys_lv:
         sections_html.append(
-            '<div class="secbox"><h2 class="sec">📊 大纲要求·掌握/熟悉<span class="sc"></span></h2>'
-            + group_html("🔷 掌握 · 重点病种(必刷)", lv_hi)
-            + group_html("◽ 熟悉 · 小众病种", lv_lo)
+            '<div class="secbox"><h2 class="sec">📊 大纲要求·掌握优先(按系统)<span class="sc"></span></h2>'
+            + "".join(group_html(f"{t} · 掌握{hi_n}", gids) for t, hi_n, gids in sys_lv)
             + "</div>")
     # 考试
     exam_groups = list(groups03)
