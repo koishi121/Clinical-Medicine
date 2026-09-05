@@ -292,6 +292,11 @@ def collect(root, idmap):
         zrm = os.path.join(zl, "README.md")
         if os.path.isfile(zrm):
             add_md(zrm, "📂 资料 · 教材/题库指南")
+        # 资料根下其它清单/报告(人卫教材清单、覆盖度对账等)
+        for f in sorted(os.listdir(zl)):
+            fp = os.path.join(zl, f)
+            if f.lower().endswith(".md") and f.lower() != "readme.md" and os.path.isfile(fp):
+                add_md(fp, f"📄 资料 · {os.path.splitext(f)[0]}")
         old = os.path.join(zl, "旧笔记")
         if os.path.isdir(old):
             for f in ("index.html", "README.md", "拆图方案评估.md"):
@@ -518,8 +523,10 @@ def build(root):
 
     # 资料
     zl_groups = []
-    zl_groups.append(("📂 资料 · 教材/题库指南",
-                      [e.id for e in entries if e.path.replace("\\", "/") == "资料/README.md"]))
+    zl_base_ids = [e.id for e in entries
+                   if e.path.replace("\\", "/").startswith("资料/")
+                   and not e.path.replace("\\", "/").startswith("资料/旧笔记/")]
+    zl_groups.append(("📂 资料 · 教材/清单/报告", zl_base_ids))
     old_base = "资料/旧笔记/"
     zl_groups.append(("📌 旧笔记 · 登记/映射/方案",
                       [e.id for e in entries if e.path.replace("\\", "/").startswith(old_base)
