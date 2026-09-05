@@ -297,6 +297,13 @@ def collect(root, idmap):
             fp = os.path.join(zl, f)
             if f.lower().endswith(".md") and f.lower() != "readme.md" and os.path.isfile(fp):
                 add_md(fp, f"📄 资料 · {os.path.splitext(f)[0]}")
+        # 资料下其它子目录(教材等)的 README 说明
+        for d in sorted(os.listdir(zl)):
+            dd = os.path.join(zl, d)
+            if os.path.isdir(dd) and d != "旧笔记":
+                dmd = os.path.join(dd, "README.md")
+                if os.path.isfile(dmd):
+                    add_md(dmd, f"📂 资料 · {d} · 说明")
         old = os.path.join(zl, "旧笔记")
         if os.path.isdir(old):
             for f in ("index.html", "README.md", "拆图方案评估.md"):
