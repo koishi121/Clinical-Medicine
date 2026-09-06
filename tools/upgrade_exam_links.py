@@ -36,9 +36,12 @@ LINE_C = re.compile(r"^- \*\*关联卡\*\*:\[(?P<name>[^\]]+)\]\((?P<link>[^)]+)
 
 
 def slugify(h):
-    """github-slugger v2 兼容(供 VS Code/预览锚点)。"""
-    s = h.lower().strip()
-    s = re.sub(r"[*+~.(),'\"!?:@]", "", s)
+    """对齐 VS Code githubSlugifier(fromHeading)。
+    流程: trim → lower → 剔除一切非 [字母/数字/_/空格/-] 的字符(中文间隔号·、括号等全删)
+          → 空白替换为 -
+    """
+    s = h.strip().lower()
+    s = re.sub(r"[^\w\s-]", "", s)   # \w 在 py3 含中文与数字下划线;删除 ·() 等
     s = re.sub(r"\s+", "-", s)
     return s
 
@@ -82,20 +85,30 @@ def parse_blocks():
             cur["name"] = m.group("name")
             cur["link"] = m.group("link")
             cur = None
-    # 回填每题号总块数,并给重复块修正 slug(-occ)
+    # 回填每题号总块数(仅用于卡片〔块k/m〕提示)
     tot = {}
     for b in blocks:
         k = (b["st"], b["un"], b["no"])
         tot[k] = tot.get(k, 0) + 1
     for b in blocks:
         b["total"] = tot[(b["st"], b["un"], b["no"])]
-        if b["total"] > 1 and b["occ"] >= 1:
-            b["slug"] = f"{b['slug']}-{b['occ']}"
+    # 模拟 VS Code githubSlugifier.createBuilder():同标题 slug 第二次起追加 -1/-2…
+    # (blocks 按文档顺序 append,顺序即文件顺序)
+    seen = {}
+    for b in blocks:
+        base = b["slug"]
+        if base not in seen:
+            seen[base] = 0
+        else:
+            seen[base] += 1
+            b["slug"] = f"{base}-{seen[base]}"
     return blocks
 
 
 def main():
-    blocks = [b for b in parse_blocks() if b["name"]]
+    allb = parse_blocks()
+    doc_slugs = {b["slug"] for b in allb}          # 汇总全部题目标题的真实锚点(VS Code slug)
+    blocks = [b for b in allb if b["name"]]
     # 卡名 → 题目
     by_card = OrderedDict()
     for b in sorted(blocks, key=lambda x: (x["st"], UNIT_NO.index(x["un"]), x["no"], x["occ"])):
@@ -109,6 +122,7 @@ def main():
 
     updated = inserted = skipped = missing = 0
     total_links = 0
+    frags = []
     for card, items in by_card.items():
         path = card_file.get(card)
         if not path:
@@ -128,6 +142,7 @@ def main():
             dup = f"〔块{it['occ'] + 1}/{it['total']}〕" if it["total"] > 1 else ""
             text = f"{shorten(it['q'])} · 答案 {a_short}"
             new_lines.append(f"- [{seg}]({rel}#{it['slug']}){dup} {text}")
+            frags.append(it["slug"])
         block = "\n".join("> " + s for s in new_lines)
 
         lines = content.split("\n")
@@ -153,6 +168,13 @@ def main():
             inserted += 1
 
     print(f"卡(升级/新插)={updated}/{inserted}, 链接条目={total_links}, 缺卡={missing}, 无考点提示跳过={skipped}")
+    # 自检:每个链接 fragment 都必须命中汇总标题的 slug 集合
+    miss = sorted({f for f in frags if f not in doc_slugs})
+    print(f"自检: 链接 fragment {len(frags)} 个, 未命中汇总锚点 {len(miss)} 个")
+    for x in miss:
+        print("  未命中:", x)
+    if not miss:
+        print("✓ 全部链接可精确定位到对应题目标题")
 
 
 if __name__ == "__main__":
