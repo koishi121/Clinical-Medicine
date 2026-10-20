@@ -39,6 +39,9 @@ def audit(root: Path) -> list[str]:
         rows = list(reader)
     seen: set[str] = set()
     for index, row in enumerate(rows, 2):
+        if None in row or any(row.get(field) is None for field in FIELDS):
+            issues.append(f"第 {index} 行列数不符")
+            continue
         path = row["path"]
         if path in seen:
             issues.append(f"第 {index} 行重复路径：{path}")

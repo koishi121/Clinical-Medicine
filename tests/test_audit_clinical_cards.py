@@ -39,6 +39,13 @@ class AuditTests(unittest.TestCase):
             self.manifest(root, self.row() + self.row())
             self.assertTrue(any("重复" in issue for issue in audit(root)))
 
+    def test_extra_tsv_column_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.setup_root(root)
+            self.manifest(root, self.row().rstrip("\n") + "\tunexpected\n")
+            self.assertTrue(any("列数" in issue for issue in audit(root)))
+
     def test_non_disease_adapted_sections_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
