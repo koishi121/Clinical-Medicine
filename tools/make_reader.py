@@ -13,7 +13,9 @@ import os
 import re
 import sys
 import html as _h
+import posixpath
 from datetime import date
+from urllib.parse import unquote, urlsplit
 
 DEFAULT_ROOT = r"d:\Clinical Medicine"
 SKIP_DIRS = {".git", "__pycache__", ".vs", ".vscode", "node_modules", "assets", "MHT"}
@@ -42,30 +44,43 @@ _ITAL_RE = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
 _CB_RE = re.compile(r"\[([ xX])\]\s*")
 _IMG_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+_MATERIAL_PATH_RE = re.compile(
+    r"(?:[A-Za-z]:[\\/][^`<>\"'\r\n]*?资料[\\/][^`<>\"'\r\n]*|资料[\\/][^`<>\"'\r\n]*)"
+)
 
 
-def _mk_link(text, url, idmap):
+def redact_material_paths(src: str) -> str:
+    """Hide references to local source materials in the generated reader."""
+    return _MATERIAL_PATH_RE.sub("[本地资料路径已省略]", src)
+
+
+def _mk_link(text, url, idmap, source_path):
     u = url.strip()
     low = u.lower()
     if low.startswith(("http://", "https://", "mailto:")):
         return f'<a class="ext" href="{esc(u)}" target="_blank" rel="noopener">{esc(text)}</a>'
     if low.startswith("#"):
         return esc(text)
-    key = norm(u)
-    for k, pid in idmap.items():
-        if k == key or os.path.basename(k) == os.path.basename(key):
-            return f'<a href="#" data-id="{pid}">{esc(text)}</a>'
+    parsed = urlsplit(u)
+    if parsed.scheme or parsed.netloc or not parsed.path:
+        return esc(text)
+    target = unquote(parsed.path)
+    key = norm(posixpath.normpath(posixpath.join(posixpath.dirname(source_path), target)))
+    if key in idmap:
+        return f'<a href="#" data-id="{idmap[key]}">{esc(text)}</a>'
     return f'<span class="muted-link">{esc(text)}</span>'
 
 
-def inline(s, idmap):
+def inline(s, idmap, source_path):
     s = esc(s)
     s = _IMG_RE.sub(lambda m: f'<span class="img-note">🖼 {esc(m.group(1)) or "图"}</span>', s)
     s = _CODE_RE.sub(r"<code>\1</code>", s)
     s = _BOLD_RE.sub(r"<strong>\1</strong>", s)
     s = _ITAL_RE.sub(r"<em>\1</em>", s)
-    s = _CB_RE.sub(lambda m: '<span class="cb' + (' done">✓' if m.group(1).lower() == 'x' else '">') + '</span>', s)
-    s = _LINK_RE.sub(lambda m: _mk_link(m.group(1), m.group(2), idmap), s)
+    s = _CB_RE.sub(lambda m: '<span class="cb' +
+                   (' done" role="img" aria-label="已完成">✓' if m.group(1).lower() == 'x'
+                    else '" role="img" aria-label="未完成">') + '</span>', s)
+    s = _LINK_RE.sub(lambda m: _mk_link(m.group(1), m.group(2), idmap, source_path), s)
     return s
 
 
@@ -78,16 +93,17 @@ def _cells(row):
     return [c.strip() for c in r.split("|")]
 
 
-def _render_table(rows, idmap):
+def _render_table(rows, idmap, source_path):
     head = _cells(rows[0])
-    out = ['<table><thead><tr>' + ''.join(f'<th>{inline(c, idmap)}</th>' for c in head) + '</tr></thead><tbody>']
+    out = ['<table><thead><tr>' + ''.join(f'<th>{inline(c, idmap, source_path)}</th>' for c in head) + '</tr></thead><tbody>']
     for r in rows[2:]:
-        out.append('<tr>' + ''.join(f'<td>{inline(c, idmap)}</td>' for c in _cells(r)) + '</tr>')
+        out.append('<tr>' + ''.join(f'<td>{inline(c, idmap, source_path)}</td>' for c in _cells(r)) + '</tr>')
     out.append('</tbody></table>')
-    return "".join(out)
+    return ('<div class="table-wrap" role="region" aria-label="可横向滚动的数据表" tabindex="0">'
+            + "".join(out) + "</div>")
 
 
-def md_to_html(src, idmap):
+def md_to_html(src, idmap, source_path):
     lines = src.split("\n")
     out = []
     buf = []
@@ -95,7 +111,7 @@ def md_to_html(src, idmap):
 
     def flush():
         if buf:
-            out.append(f'<p>{"<br>".join(inline(x, idmap) for x in buf)}</p>')
+            out.append(f'<p>{"<br>".join(inline(x, idmap, source_path) for x in buf)}</p>')
             buf.clear()
 
     while i < len(lines):
@@ -110,7 +126,7 @@ def md_to_html(src, idmap):
                 j += 1
             if len(tl) >= 2 and re.match(r"^\s*\|?[\s:|-]+\|[\s:|-]*\|?\s*$", tl[1]):
                 flush()
-                out.append(_render_table(tl, idmap))
+                out.append(_render_table(tl, idmap, source_path))
                 i = j
                 continue
         if not st:
@@ -128,20 +144,20 @@ def md_to_html(src, idmap):
             out.append("<pre>" + _h.escape("\n".join(code)) + "</pre>")
             continue
         if st.startswith("#### "):
-            flush(); out.append(f'<h4>{inline(st[5:], idmap)}</h4>'); i += 1; continue
+            flush(); out.append(f'<h4>{inline(st[5:], idmap, source_path)}</h4>'); i += 1; continue
         if st.startswith("### "):
-            flush(); out.append(f'<h3>{inline(st[4:], idmap)}</h3>'); i += 1; continue
+            flush(); out.append(f'<h3>{inline(st[4:], idmap, source_path)}</h3>'); i += 1; continue
         if st.startswith("## "):
-            flush(); out.append(f'<h2>{inline(st[3:], idmap)}</h2>'); i += 1; continue
+            flush(); out.append(f'<h2>{inline(st[3:], idmap, source_path)}</h2>'); i += 1; continue
         if st.startswith("# "):
-            flush(); out.append(f'<h1>{inline(st[2:], idmap)}</h1>'); i += 1; continue
+            flush(); out.append(f'<h1>{inline(st[2:], idmap, source_path)}</h1>'); i += 1; continue
         if st.startswith("> "):
             flush()
             q = []
             while i < len(lines) and lines[i].strip().startswith(">"):
                 q.append(lines[i].strip()[1:].strip())
                 i += 1
-            out.append(f'<blockquote><p>{"<br>".join(inline(x, idmap) for x in q)}</p></blockquote>')
+            out.append(f'<blockquote><p>{"<br>".join(inline(x, idmap, source_path) for x in q)}</p></blockquote>')
             continue
         if re.match(r"^[-*]\s+", st):
             flush()
@@ -149,7 +165,7 @@ def md_to_html(src, idmap):
             while i < len(lines) and re.match(r"^\s*[-*]\s+", lines[i]):
                 items.append(re.sub(r"^\s*[-*]\s+", "", lines[i]))
                 i += 1
-            out.append("<ul>" + "".join(f"<li>{inline(x, idmap)}</li>" for x in items) + "</ul>")
+            out.append("<ul>" + "".join(f"<li>{inline(x, idmap, source_path)}</li>" for x in items) + "</ul>")
             continue
         if re.match(r"^\s*\d+\.\s+", st):
             flush()
@@ -157,7 +173,7 @@ def md_to_html(src, idmap):
             while i < len(lines) and re.match(r"^\s*\d+\.\s+", lines[i]):
                 items.append(re.sub(r"^\s*\d+\.\s+", "", lines[i]))
                 i += 1
-            out.append("<ol>" + "".join(f"<li>{inline(x, idmap)}</li>" for x in items) + "</ol>")
+            out.append("<ol>" + "".join(f"<li>{inline(x, idmap, source_path)}</li>" for x in items) + "</ol>")
             continue
         if st == "---":
             flush(); out.append("<hr>"); i += 1; continue
@@ -184,7 +200,28 @@ def collect(root, idmap):
     """返回 {relpath: eid} idmap 与 entries 列表。"""
     entries = []
     counter = [0]
-    idmap.update({})  # ensure
+    ordered_paths = []
+    for filename in ("README.md", "CONTEXT.md", "大纲导航.md"):
+        path = os.path.join(root, filename)
+        if os.path.isfile(path):
+            ordered_paths.append(path)
+    for section in ("考试", "规培"):
+        base = os.path.join(root, section)
+        if os.path.isdir(base):
+            for current, dirs, files in os.walk(base):
+                dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+                ordered_paths.extend(os.path.join(current, f) for f in sorted(files)
+                                     if f.lower().endswith(".md"))
+    adr = os.path.join(root, "docs", "adr")
+    if os.path.isdir(adr):
+        ordered_paths.extend(os.path.join(adr, f) for f in sorted(os.listdir(adr))
+                             if f.lower().endswith(".md"))
+    tools = os.path.join(root, "tools")
+    if os.path.isdir(tools):
+        ordered_paths.extend(os.path.join(tools, f) for f in sorted(os.listdir(tools))
+                             if f.lower().endswith((".py", ".md")))
+    for eid, path in enumerate(ordered_paths, start=1):
+        idmap[norm(rel(root, path))] = eid
 
     def add(title, path, body_html, level=""):
         counter[0] += 1
@@ -197,17 +234,17 @@ def collect(root, idmap):
     def add_md(path, title=None):
         try:
             with open(path, encoding="utf-8") as f:
-                src = f.read()
+                src = redact_material_paths(f.read())
         except (OSError, UnicodeDecodeError):
             return None
         t = title or os.path.splitext(os.path.basename(path))[0]
         m = re.search(r">\s*大纲要求\s*:([^\n]*)", src)
         lv = (m.group(1).strip() if m else "") or ""
-        return add(t, path, md_to_html(src, idmap), lv)
+        return add(t, path, md_to_html(src, idmap, norm(rel(root, path))), lv)
 
     def add_file(path, title=None):
         with open(path, encoding="utf-8") as f:
-            src = f.read()
+            src = redact_material_paths(f.read())
         t = title or os.path.splitext(os.path.basename(path))[0]
         return add(t, path, "<pre>" + _h.escape(src) + "</pre>")
 
@@ -239,87 +276,16 @@ def collect(root, idmap):
     if os.path.isfile(dp):
         add_md(dp, "🧭 大纲导航(2026)")
 
-    # 考试
-    exam = os.path.join(root, "考试")
-    if os.path.isdir(exam):
-        for unit in sorted(os.listdir(exam)):
-            ur = os.path.join(exam, unit)
-            if not os.path.isdir(ur):
-                continue
-            if unit == "03_临床医学综合":
-                for sysname in sorted(os.listdir(ur)):
-                    sr = os.path.join(ur, sysname)
-                    if not os.path.isdir(sr):
-                        continue
-                    srm = os.path.join(sr, "README.md")
-                    if os.path.isfile(srm):
-                        add_md(srm, f"💾 {sysname}")
-                    for f in sorted(os.listdir(sr)):
-                        fp = os.path.join(sr, f)
-                        if os.path.isfile(fp) and f.lower().endswith(".md") and f.lower() != "readme.md":
-                            add_md(fp)
-            else:
-                urm = os.path.join(ur, "README.md")
-                if os.path.isfile(urm):
-                    add_md(urm, f"📘 {unit}")
-                for f in sorted(os.listdir(ur)):
-                    fp = os.path.join(ur, f)
-                    if os.path.isfile(fp) and f.lower().endswith(".md") and f.lower() != "readme.md":
-                        add_md(fp)
-
-    # 规培
-    gp = os.path.join(root, "规培")
-    if os.path.isdir(gp):
-        for dept in sorted(os.listdir(gp)):
-            dr = os.path.join(gp, dept)
-            if not os.path.isdir(dr):
-                continue
-            for sub in sorted(os.listdir(dr)):
-                sr = os.path.join(dr, sub)
-                if not os.path.isdir(sr):
-                    continue
-                srm = os.path.join(sr, "README.md")
-                if os.path.isfile(srm):
-                    add_md(srm, f"🏥 {sub}")
-                for f in sorted(os.listdir(sr)):
-                    fp = os.path.join(sr, f)
-                    if os.path.isfile(fp) and f.lower().endswith(".md") and f.lower() != "readme.md":
-                        add_md(fp)
-
-    # 资料
-    zl = os.path.join(root, "资料")
-    if os.path.isdir(zl):
-        zrm = os.path.join(zl, "README.md")
-        if os.path.isfile(zrm):
-            add_md(zrm, "📂 资料 · 教材/题库指南")
-        # 资料根下其它清单/报告(人卫教材清单、覆盖度对账等)
-        for f in sorted(os.listdir(zl)):
-            fp = os.path.join(zl, f)
-            if f.lower().endswith(".md") and f.lower() != "readme.md" and os.path.isfile(fp):
-                add_md(fp, f"📄 资料 · {os.path.splitext(f)[0]}")
-        # 资料下其它子目录(教材等)的 README 说明
-        for d in sorted(os.listdir(zl)):
-            dd = os.path.join(zl, d)
-            if os.path.isdir(dd) and d != "旧笔记":
-                dmd = os.path.join(dd, "README.md")
-                if os.path.isfile(dmd):
-                    add_md(dmd, f"📂 资料 · {d} · 说明")
-        old = os.path.join(zl, "旧笔记")
-        if os.path.isdir(old):
-            for f in ("index.html", "README.md", "拆图方案评估.md"):
-                fp = os.path.join(old, f)
-                if os.path.isfile(fp):
-                    if f.endswith(".md"):
-                        add_md(fp, {"README.md": "📋 旧笔记 · 登记表",
-                                    "拆图方案评估.md": "🧾 旧笔记 · 拆图方案评估"}[f])
-                    else:
-                        add_external(fp, "🗺️ 旧笔记 · 考试×规培映射页")
-            hdir = os.path.join(old, "html")
-            if os.path.isdir(hdir):
-                for d in sorted(os.listdir(hdir)):
-                    fp = os.path.join(hdir, d, f"{d}.html")
-                    if os.path.isfile(fp):
-                        add_external(fp, f"📄 {d}", "超大图库(如 医学影像学 25MB/201 图)建议系统浏览器打开并放大查看。")
+    # 考试与规培：递归收集 Markdown，保留各层 README 作为导航内容。
+    for section in ("考试", "规培"):
+        base = os.path.join(root, section)
+        if not os.path.isdir(base):
+            continue
+        for current, dirs, files in os.walk(base):
+            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+            for filename in sorted(files):
+                if filename.lower().endswith(".md"):
+                    add_md(os.path.join(current, filename))
 
     # 文档 ADR
     adr = os.path.join(root, "docs", "adr")
@@ -355,6 +321,9 @@ html,body{background:#faf6ee;color:#3f3f3f;height:100%;
  font-size:15px;line-height:1.85;}
 body{display:flex;height:100vh;overflow:hidden;margin:0;}
 *{box-sizing:border-box;}
+.skip-link{position:absolute;left:-10000px;top:8px;z-index:1000;padding:8px 12px;
+ background:#fffdf8;color:#6b4a1f;border:2px solid #d09c4c;border-radius:8px;}
+.skip-link:focus{left:12px;}
 #nav{width:400px;flex:0 0 400px;border-right:1px solid #e6dcc4;background:#fcf7ec;overflow:hidden;
  display:flex;flex-direction:column;}
 #navH{padding:14px 16px 10px;border-bottom:1px solid #e6dcc4;flex:0 0 auto;}
@@ -394,6 +363,8 @@ button:hover{background:#f7eed7;}
 .doc ul,.doc ol{margin:.3em 0 .6em;padding-left:1.6em;}
 .doc li{margin:.15em 0;}
 .doc table{border-collapse:collapse;max-width:100%;margin:.6em 0;font-size:14px;}
+.table-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;margin:.6em 0;}
+.table-wrap:focus{outline:2px solid #e0c88f;outline-offset:2px;}
 .doc th,.doc td{border:1px solid #e0d4ba;padding:6px 11px;background:#fffdf8;}
 .doc th{background:#f1e6d0;color:#6b4a1f;}
 .doc blockquote{background:#f6efdd;border-left:5px solid #dcc28a;border-radius:6px;
@@ -434,15 +405,17 @@ function ready(){
   var docs={};
   document.querySelectorAll('.doc').forEach(function(d){docs[d.dataset.id]=d;});
   function show(id){
-    document.querySelectorAll('.it').forEach(function(x){x.classList.remove('active');});
+    document.querySelectorAll('.it').forEach(function(x){
+      x.classList.remove('active'); x.removeAttribute('aria-current');
+    });
     var a=document.querySelector('[data-id="'+id+'"]');
-    if(a){a.classList.add('active');}
+    if(a){a.classList.add('active'); a.setAttribute('aria-current','page');}
     document.querySelectorAll('.doc').forEach(function(d){d.hidden=true;});
     var d=docs[id];
     VIEWER.scrollTop=0;
     if(d){d.hidden=false;} else {DEAD.hidden=false;}
   }
-  document.querySelectorAll('[data-id]').forEach(function(a){
+  document.querySelectorAll('a[data-id]').forEach(function(a){
     a.addEventListener('click',function(e){e.preventDefault(); show(a.dataset.id);});
   });
   document.addEventListener('click',function(e){
@@ -493,63 +466,44 @@ def build(root):
     entries = collect(root, idmap)
     by_id = {e.id: e for e in entries}
 
-    ex = os.path.join(root, "考试")
-    gp = os.path.join(root, "规培")
-    zl = os.path.join(root, "资料")
+    # 以源文件相对路径形成稳定的考试单元/系统和规培科室分组。
+    exam_map = {}
+    gp_map = {}
+    for entry in entries:
+        parts = entry.path.replace("\\", "/").split("/")
+        if parts[0] == "考试" and len(parts) >= 2:
+            key = tuple(parts[1:3]) if len(parts) >= 4 else (parts[1],)
+            if len(parts) == 2:
+                key = (parts[1], "总览")
+            exam_map.setdefault(key, []).append(entry.id)
+        elif parts[0] == "规培" and len(parts) >= 2:
+            key = tuple(parts[1:3]) if len(parts) >= 4 else (parts[1], "总览")
+            gp_map.setdefault(key, []).append(entry.id)
 
-    # 03 临床医学综合:14 系统各一组
-    groups03 = []
-    if os.path.isdir(ex):
-        for unit in sorted(os.listdir(ex)):
-            ur = os.path.join(ex, unit)
-            if not os.path.isdir(ur):
-                continue
-            if unit == "03_临床医学综合":
-                for sysname in sorted(os.listdir(ur)):
-                    sr = os.path.join(ur, sysname)
-                    if not os.path.isdir(sr):
-                        continue
-                    prefix = "考试/03_临床医学综合/" + sysname + "/"
-                    gids = [e.id for e in entries if e.path.replace("\\", "/").startswith(prefix)]
-                    groups03.append((f"💾 {sysname}", gids))
-
-    # 规培:内科科室各一组
-    gp_groups = []
-    if os.path.isdir(gp):
-        for dept in sorted(os.listdir(gp)):
-            dr = os.path.join(gp, dept)
-            if not os.path.isdir(dr):
-                continue
-            for sub in sorted(os.listdir(dr)):
-                sr = os.path.join(dr, sub)
-                if not os.path.isdir(sr):
-                    continue
-                gids = [e.id for e in entries
-                        if e.path.replace("\\", "/").startswith("规培/" + dept + "/" + sub + "/")]
-                gp_groups.append((f"🏥 {sub}", gids))
-
-    # 资料
-    zl_groups = []
-    zl_base_ids = [e.id for e in entries
-                   if e.path.replace("\\", "/").startswith("资料/")
-                   and not e.path.replace("\\", "/").startswith("资料/旧笔记/")]
-    zl_groups.append(("📂 资料 · 教材/清单/报告", zl_base_ids))
-    old_base = "资料/旧笔记/"
-    zl_groups.append(("📌 旧笔记 · 登记/映射/方案",
-                      [e.id for e in entries if e.path.replace("\\", "/").startswith(old_base)
-                       and "/html/" not in e.path.replace("\\", "/")]))
-    zl_groups.append(("📄 旧笔记 · HTML 单文件(20 科,独立大文件)",
-                      [e.id for e in entries if "/html/" in e.path.replace("\\", "/")]))
+    exam_groups = [("📘 " + " · ".join(key), gids)
+                   for key, gids in sorted(exam_map.items())]
+    gp_groups = [("🏥 " + " · ".join(key), gids)
+                 for key, gids in sorted(gp_map.items())]
+    for key, gids in exam_map.items():
+        if key[0] == "03_临床医学综合":
+            gids.sort(key=lambda eid: (
+                0 if by_id[eid].level.startswith("🔷") else
+                1 if by_id[eid].level.startswith("◽") else 2,
+                by_id[eid].title,
+            ))
 
     # 文档
     doc_groups = [
         ("📖 术语表 / 🏠 总览",
-         [e.id for e in entries if e.path.replace("\\", "/") in ("CONTEXT.md", "README.md")]),
+         [e.id for e in entries if e.path.replace("\\", "/") in
+          ("CONTEXT.md", "README.md", "大纲导航.md")]),
         ("📐 架构决策 ADR",
          [e.id for e in entries if e.path.replace("\\", "/").startswith("docs/adr/")]),
     ]
     # 工具
     tool_gids = [e.id for e in entries if e.path.replace("\\", "/").startswith("tools/")]
+    nav_groups = exam_groups + gp_groups + doc_groups + [("工具脚本", tool_gids)]
+    first_nav_id = next((gids[0] for _, gids in nav_groups if gids), None)
 
     # ---- 组装导航 ----
     def lv_emoji(e):
@@ -566,7 +520,8 @@ def build(root):
         for gid in gids:
             e = by_id[gid]
             nm = (lv_emoji(e) + " " + e.title).strip() if lv_emoji(e) else e.title
-            items.append(f'<a class="it" data-id="{e.id}" data-t="{esc(e.title + " " + e.path)}">'
+            current = ' aria-current="page"' if e.id == first_nav_id else ""
+            items.append(f'<a class="it" data-id="{e.id}" href="#d-{e.id}" data-t="{esc(e.title + " " + e.path)}"{current}>'
                          f'<span class="nm">{esc(nm)}</span>'
                          f'<span class="sub">{esc(e.path)}</span></a>')
         return (f'<div class="grp"><h3 class="h3">{esc(title)}'
@@ -574,43 +529,18 @@ def build(root):
                 f'<div class="items">{"".join(items)}</div></div>')
 
     sections_html = []
-    # 📊 大纲要求·掌握优先(按系统):掌握卡多的系统排前,系统内🔷在前◽在后
-    sys_lv = []
-    for sysname, gids in groups03:
-        lv_gids = [g for g in gids if by_id[g].level]
-        if not lv_gids:
-            continue
-        hi_n = sum(1 for g in lv_gids if by_id[g].level.startswith("🔷"))
-        lv_gids.sort(key=lambda g: (0 if by_id[g].level.startswith("🔷") else 1, by_id[g].title))
-        sys_lv.append((sysname, hi_n, lv_gids))
-    sys_lv.sort(key=lambda x: (-x[1], x[0]))
-    if sys_lv:
+    def add_section(title, groups):
+        if not groups:
+            return
         sections_html.append(
-            '<div class="secbox"><h2 class="sec">📊 大纲要求·掌握优先(按系统)<span class="sc"></span></h2>'
-            + "".join(group_html(f"{t} · 掌握{hi_n}", gids) for t, hi_n, gids in sys_lv)
+            f'<div class="secbox"><h2 class="sec">{esc(title)}<span class="sc"></span></h2>'
+            + "".join(group_html(group_title, gids) for group_title, gids in groups)
             + "</div>")
-    # 考试
-    exam_groups = list(groups03)
-    for unit in ["00_大纲与计划", "01_基础医学综合", "02_医学人文综合", "04_预防医学综合", "05_实践技能"]:
-        gids = [e.id for e in entries if e.path.replace("\\", "/").startswith("考试/" + unit + "/")]
-        if gids:
-            exam_groups.append((f"📘 {unit}", gids))
-    sections_html.append(
-        f'<div class="secbox"><h2 class="sec">📚 考试·备考<span class="sc"></span></h2>'
-        + "".join(group_html(t, g) for t, g in exam_groups)
-        + "</div>")
-    sections_html.append(
-        '<div class="secbox"><h2 class="sec">🏥 规培·内科轮转<span class="sc"></span></h2>'
-        + "".join(group_html(t, g) for t, g in gp_groups) + "</div>")
-    sections_html.append(
-        '<div class="secbox"><h2 class="sec">📂 资料<span class="sc"></span></h2>'
-        + "".join(group_html(t, g) for t, g in zl_groups) + "</div>")
-    sections_html.append(
-        '<div class="secbox"><h2 class="sec">📄 文档·决策<span class="sc"></span></h2>'
-        + "".join(group_html(t, g) for t, g in doc_groups) + "</div>")
-    sections_html.append(
-        '<div class="secbox"><h2 class="sec">🛠 工具<span class="sc"></span></h2>'
-        + group_html("工具脚本", tool_gids) + "</div>")
+
+    add_section("📚 考试·备考", exam_groups)
+    add_section("🏥 规培·内科轮转", gp_groups)
+    add_section("📄 文档·决策", doc_groups)
+    add_section("🛠 工具", [("工具脚本", tool_gids)] if tool_gids else [])
 
     # 文档内容
     docs_html = ['<div id="ph" hidden>← 从左侧选择一个条目开始阅读</div>']
@@ -626,12 +556,13 @@ def build(root):
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
             "<title>🏠 Clinical Medicine · 离线阅读器</title>\n"
             "<style>" + CSS + "</style>\n</head>\n<body>\n"
-            "<nav id=\"nav\">"
+            '<a class="skip-link" href="#viewer">跳转到正文</a>\n'
+            "<nav id=\"nav\" aria-label=\"章节导航\">"
             "<div id=\"navH\"><h1>🏠 Clinical Medicine</h1>"
-            "<div class=\"search\"><input id=\"q\" placeholder=\"🔍 病种/科室/科目/文件名…\" autofocus>"
-            "<button id=\"clr\">清除</button></div><div id=\"res\"></div></div>"
+            "<div class=\"search\"><input id=\"q\" aria-label=\"搜索考试和规培条目\" placeholder=\"🔍 病种/科室/科目/文件名…\">"
+            "<button id=\"clr\">清除</button></div><div id=\"res\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\"></div></div>"
             "<div id=\"tree\">" + "".join(sections_html) + "</div></nav>\n"
-            f"<main id=\"viewer\">{''.join(docs_html)}</main>\n"
+            f"<main id=\"viewer\" tabindex=\"-1\">{''.join(docs_html)}</main>\n"
             '<button id="backTop">▲ 回顶</button>\n'
             "<script>" + JS + "</script>\n</body>\n</html>")
 
@@ -642,7 +573,7 @@ def main():
     out = os.path.join(root, OUT_NAME)
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
-    print(f"wrote: {out}  ({len(page) / 1024 / 1024:.2f} MB, {page.count('data-id=\"')} 条目)")
+    print(f"wrote: {out}  ({len(page) / 1024 / 1024:.2f} MB, {page.count('<article class=\"doc\"')} 条目)")
 
 
 if __name__ == "__main__":
