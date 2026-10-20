@@ -1,5 +1,7 @@
 # Clinical Medicine — 执医考备考 + 规培病种 工作区
 
+> 📱 **手机阅读：**[打开在线临床口袋手册](https://koishi121.github.io/Clinical-Medicine/)
+
 双用途个人工作区,纯 Markdown 组织。
 
 > 🗺️ **全库快捷索引(HTML)**:双击 [`索引.html`](索引.html) 打开**临床口袋手册**——按考试单元/系统、规培科室、项目文档和工具检索 Markdown；手机可用目录按钮展开导航、调整正文字号。本地原始教材目录不嵌入 HTML。`索引.html` 是可单独拷贝的离线文件；内容更新后运行 `python tools/make_reader.py` 重生成，页面样式与交互源文件分别在 `tools/reader_styles.css` 和 `tools/reader_app.js`。
