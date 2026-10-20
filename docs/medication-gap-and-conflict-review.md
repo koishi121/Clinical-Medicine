@@ -21,7 +21,10 @@
 - **急性胰腺炎：**病种卡现已写明奥曲肽/生长抑素不是所有患者的常规方案；与精修药卡一致。待带教继续核查 ERCP 后胰腺炎等旧卡残留。
 - **呼吸：**现有吸入药卡已区分哮喘含 ICS 的缓解路径与 COPD 维持路径；新急性发作页会再次链接，避免把长期控制用药当作急救。依据 [GINA 2026](https://ginasthma.org/2026-gina-summary-guide/)。
 
+- **抗磷脂综合征：**病种卡已删除将 DOAC 和华法林并列为通用替代的写法；三阳性/动脉血栓等高风险者需专科风险分层。[EULAR 建议](https://ard.bmj.com/content/78/10/1296)、[EMA 警示](https://www.ema.europa.eu/en/documents/prac-recommendation/prac-recommendations-signals-adopted-8-11-april-2019-prac-meeting_en.pdf)。
+- **妊娠梅毒：**已将“青霉素过敏可替代”改为妊娠期经评估脱敏后使用青霉素；非妊娠替代方案不得外推。[CDC 妊娠梅毒指南](https://www.cdc.gov/std/treatment-guidelines/syphilis-pregnancy.htm)。
+- **房颤抗凝：**已明确华法林 INR 目标不能套用于 DOAC，机械瓣和中重度二尖瓣狭窄等情境需单独选择。[ACC/AHA/ACCP/HRS 2023 房颤指南](https://professional.heart.org/en/science-news/2023-acc-aha-accp-hrs-guideline-for-the-diagnosis-and-management-of-atrial-fibrillation)。
 ## 待复核项
 
-- 消化系统“胆管结石”卡将“ERCP 后胰腺炎禁食+生长抑素”写成常规并不妥，须与消化卡片编辑者协同改正，不在并行编辑时覆盖其文件。
+- 消化系统“胆管结石”卡现已改正 ERCP 后胰腺炎的常规“禁食+生长抑素”表述，仍须带教核对其处置与随访细节。
 - 既有病种卡的治疗段仍含教材速记和历史方案，本审计只覆盖已发现的明显冲突。任何剂量和给药途径在使用前须重新对照本院制剂与权限。
