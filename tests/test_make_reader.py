@@ -76,6 +76,7 @@ class ReaderCollectionTests(unittest.TestCase):
             self.assertIn('id="viewer"', page)
             self.assertNotIn("考试·备考", page)
             self.assertNotIn("规培·内科轮转", page)
+            self.assertNotIn("文档·决策", page)
 
     def test_build_includes_accessible_navigation_search_checkboxes_and_tables(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -163,6 +164,22 @@ class ReaderCollectionTests(unittest.TestCase):
 
             self.assertIn("考试/README.md", nav_paths)
             self.assertIn("规培/README.md", nav_paths)
+
+    def test_portable_reader_has_mobile_navigation_and_reading_controls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root, "规培/内科/README.md", "# 轮转总览\n")
+
+            page = make_reader.build(str(root))
+
+            self.assertIn('id="menuToggle" aria-controls="nav" aria-expanded="false"', page)
+            self.assertIn('id="navClose"', page)
+            self.assertIn('id="fontInc"', page)
+            self.assertIn('id="fontDec"', page)
+            self.assertIn('<details class="grp"', page)
+            self.assertIn('aria-label="关闭目录"', page)
+            self.assertNotIn('<script src=', page)
+            self.assertNotIn('<link rel="stylesheet"', page)
 
 
 if __name__ == "__main__":

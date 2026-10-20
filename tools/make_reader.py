@@ -14,7 +14,6 @@ import re
 import sys
 import html as _h
 import posixpath
-from datetime import date
 from urllib.parse import unquote, urlsplit
 
 DEFAULT_ROOT = r"d:\Clinical Medicine"
@@ -315,151 +314,11 @@ def urllib_quote(p):
 
 
 # ---------------- 页面骨架 ----------------
-CSS = """
-html,body{background:#faf6ee;color:#3f3f3f;height:100%;
- font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC",system-ui,-apple-system,"Segoe UI",sans-serif;
- font-size:15px;line-height:1.85;}
-body{display:flex;height:100vh;overflow:hidden;margin:0;}
-*{box-sizing:border-box;}
-.skip-link{position:absolute;left:-10000px;top:8px;z-index:1000;padding:8px 12px;
- background:#fffdf8;color:#6b4a1f;border:2px solid #d09c4c;border-radius:8px;}
-.skip-link:focus{left:12px;}
-#nav{width:400px;flex:0 0 400px;border-right:1px solid #e6dcc4;background:#fcf7ec;overflow:hidden;
- display:flex;flex-direction:column;}
-#navH{padding:14px 16px 10px;border-bottom:1px solid #e6dcc4;flex:0 0 auto;}
-#navH h1{font-size:18px;color:#7a5224;margin:0 0 8px;}
-.search{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.search input{flex:1;min-width:150px;font:inherit;font-size:14px;padding:8px 12px;
- border:1px solid #d9cbb0;border-radius:8px;background:#fffdf8;color:#3f3f3f;}
-.search input:focus{outline:2px solid #e0c88f;}
-button{font:inherit;font-size:13px;padding:6px 12px;border:1px solid #d9cbb0;border-radius:8px;
- background:#fffdf8;color:#6b4a1f;cursor:pointer;}
-button:hover{background:#f7eed7;}
-#res{font-size:12px;color:#9a937f;margin-top:4px;}
-#tree{overflow-y:auto;flex:1;padding:8px 10px 40px;}
-.sec{color:#7a5224;font-size:15px;font-weight:700;margin:14px 4px 6px;padding-bottom:4px;
- border-bottom:1px dashed #e0d4ba;}
-.grp{margin:6px 0 10px;}
-.h3{color:#6b4a1f;font-size:13.5px;font-weight:600;margin:8px 4px 3px;}
-.h3 .cnt{display:inline-block;min-width:20px;text-align:center;font-size:11px;color:#fff;
- background:#d6bd87;border-radius:999px;padding:0 6px;margin-left:6px;line-height:17px;}
-.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;}
-.it{display:block;text-decoration:none;color:#3f3f3f;background:#fffdf8;border:1px solid #ece2cb;
- border-radius:7px;padding:5px 9px;line-height:1.5;font-size:13.5px;cursor:pointer;overflow:hidden;}
-.it .nm{display:block;color:#5f4a26;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.it .sub{display:block;font-size:11px;color:#b0a784;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.it:hover{border-color:#d6bd87;background:#fcf6e7;}
-.it.active{border-color:#d09c4c;background:#f6ead0;}
-.hide{display:none !important;}
-
-#viewer{flex:1;min-width:0;overflow-y:auto;background:#fdfbf4;}
-#ph{display:flex;align-items:center;height:100%;justify-content:center;color:#b0a784;font-size:15px;}
-.doc{max-width:880px;margin:0 auto;padding:24px 34px 60px;}
-.doc h1{color:#7a5224;font-size:24px;margin:6px 0 2px;}
-.doc h2{color:#7a5224;font-size:19px;margin:1.3em 0 .4em;border-bottom:1px solid #eee0c4;padding-bottom:4px;}
-.doc h3{color:#6b4a1f;font-size:16px;margin:1em 0 .3em;}
-.doc h4{color:#6b4a1f;font-size:14.5px;margin:.8em 0 .2em;}
-.doc p{margin:.45em 0;}
-.doc ul,.doc ol{margin:.3em 0 .6em;padding-left:1.6em;}
-.doc li{margin:.15em 0;}
-.doc table{border-collapse:collapse;max-width:100%;margin:.6em 0;font-size:14px;}
-.table-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;margin:.6em 0;}
-.table-wrap:focus{outline:2px solid #e0c88f;outline-offset:2px;}
-.doc th,.doc td{border:1px solid #e0d4ba;padding:6px 11px;background:#fffdf8;}
-.doc th{background:#f1e6d0;color:#6b4a1f;}
-.doc blockquote{background:#f6efdd;border-left:5px solid #dcc28a;border-radius:6px;
- padding:8px 14px;margin:.6em 0;color:#7a5a20;}
-.doc code{background:#f5e7cf;padding:1px 5px;border-radius:4px;font-size:13px;color:#7a4a1f;}
-.doc pre{background:#f5edd8;border:1px solid #e6d8b4;border-radius:8px;padding:12px 16px;
- overflow-x:auto;font-size:13px;line-height:1.6;}
-.doc hr{border:none;border-top:1px solid #e8dfcf;margin:1.2em 0;}
-.doc img{max-width:100%;height:auto;}
-.cb{display:inline-block;width:15px;height:15px;border:1.5px solid #b8a87e;border-radius:4px;
- vertical-align:-2px;margin-right:3px;}
-.cb.done{background:#8fb56a;color:#fff;font-size:11px;line-height:13px;text-align:center;border-color:#8fb56a;}
-.img-note{display:inline-block;background:#f2ecda;border:1px dashed #dcc28a;border-radius:6px;
- padding:2px 8px;color:#8a6a2a;font-size:13px;}
-.muted-link{color:#b0a784;}
-.ext{color:#8a5a2b;}
-.doc a.ext{color:#7a9b6d;}
-.meta{font-size:12px;color:#9a937f;margin:0 0 14px;border-bottom:1px solid #eee0c4;padding-bottom:10px;}
-.meta .p{font-family:Consolas,monospace;color:#a08c5a;}
-.btns{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
-.btn{display:inline-block;text-decoration:none;font:inherit;font-size:13px;padding:7px 14px;
- border:1px solid #d9cbb0;border-radius:8px;background:#f7eed7;color:#6b4a1f;cursor:pointer;}
-.btn:hover{background:#eeddae;}
-.extern h3{color:#7a5224;}
-.extern .hint{color:#9a937f;font-size:13px;}
-#backTop{position:fixed;right:26px;bottom:26px;padding:8px 14px;}
-@media (max-width:860px){
- body{flex-direction:column;}
- #nav{width:100%;flex:none;height:45vh;border-right:none;border-bottom:1px solid #e6dcc4;}
- #viewer{height:55vh;}
-}
-"""
-
-JS = """
-function ready(){
-  var VIEWER=document.getElementById('viewer');
-  var DEAD=document.getElementById('ph');
-  var docs={};
-  document.querySelectorAll('.doc').forEach(function(d){docs[d.dataset.id]=d;});
-  function show(id){
-    document.querySelectorAll('.it').forEach(function(x){
-      x.classList.remove('active'); x.removeAttribute('aria-current');
-    });
-    var a=document.querySelector('[data-id="'+id+'"]');
-    if(a){a.classList.add('active'); a.setAttribute('aria-current','page');}
-    document.querySelectorAll('.doc').forEach(function(d){d.hidden=true;});
-    var d=docs[id];
-    VIEWER.scrollTop=0;
-    if(d){d.hidden=false;} else {DEAD.hidden=false;}
-  }
-  document.querySelectorAll('a[data-id]').forEach(function(a){
-    a.addEventListener('click',function(e){e.preventDefault(); show(a.dataset.id);});
-  });
-  document.addEventListener('click',function(e){
-    var b=e.target.closest('[data-copy]'); if(!b)return;
-    var r=b.dataset.copy;
-    var ta=document.createElement('textarea'); ta.value=r; document.body.appendChild(ta);
-    ta.select();
-    try{document.execCommand('copy'); b.textContent='✓ 已复制';}catch(err){}
-    document.body.removeChild(ta);
-    setTimeout(function(){b.textContent='复制路径';},1500);
-  });
-  var inp=document.getElementById('q'), res=document.getElementById('res');
-  var items=[].slice.call(document.querySelectorAll('.it'));
-  var total=items.length, shownAll=0;
-  function go(){
-    var q=inp.value.trim().toLowerCase(), shown=0;
-    items.forEach(function(a){
-      var ok=!q || (a.dataset.t||'').toLowerCase().indexOf(q)>=0;
-      a.classList.toggle('hide',!ok); if(ok)shown++;
-    });
-    document.querySelectorAll('.grp').forEach(function(g){
-      var vis=[].slice.call(g.querySelectorAll('.it')).filter(function(a){return !a.classList.contains('hide');}).length;
-      var c=g.querySelector('.cnt'); if(c)c.textContent=vis;
-      g.classList.toggle('hide',vis===0);
-    });
-    document.querySelectorAll('.secbox').forEach(function(s){
-      var vis=[].slice.call(s.querySelectorAll('.it')).filter(function(a){return !a.classList.contains('hide');}).length;
-      var c=s.querySelector('.sc'); if(c)c.textContent=vis;
-      s.classList.toggle('hide', vis===0 && !!q);
-    });
-    if(!q && !document.getElementById('firstShown')){
-      // 首次展示时自动打开第一项
-    }
-    res.textContent = q ? ('匹配 '+shown+' / '+total+' 项') : ('共 '+total+' 项');
-  }
-  inp.addEventListener('input',go);
-  document.getElementById('clr').addEventListener('click',function(){inp.value='';go();inp.focus();});
-  document.getElementById('backTop').addEventListener('click',function(){VIEWER.scrollTop=0;});
-  go();
-  var first=document.querySelector('.it'); if(first){show(first.dataset.id);}
-}
-if (document.readyState==='loading'){document.addEventListener('DOMContentLoaded',ready);} else {ready();}
-"""
-
+ASSET_DIR = os.path.dirname(__file__)
+with open(os.path.join(ASSET_DIR, "reader_styles.css"), encoding="utf-8") as file:
+    CSS = file.read()
+with open(os.path.join(ASSET_DIR, "reader_app.js"), encoding="utf-8") as file:
+    JS = file.read()
 
 def build(root):
     idmap = {}
@@ -503,7 +362,10 @@ def build(root):
     # 工具
     tool_gids = [e.id for e in entries if e.path.replace("\\", "/").startswith("tools/")]
     nav_groups = exam_groups + gp_groups + doc_groups + [("工具脚本", tool_gids)]
-    first_nav_id = next((gids[0] for _, gids in nav_groups if gids), None)
+    first_nav_id = next(
+        (entry.id for entry in entries if entry.path == "规培/内科/消化内科/README.md"),
+        next((gids[0] for _, gids in nav_groups if gids), None),
+    )
 
     # ---- 组装导航 ----
     def lv_emoji(e):
@@ -524,12 +386,14 @@ def build(root):
             items.append(f'<a class="it" data-id="{e.id}" href="#d-{e.id}" data-t="{esc(e.title + " " + e.path)}"{current}>'
                          f'<span class="nm">{esc(nm)}</span>'
                          f'<span class="sub">{esc(e.path)}</span></a>')
-        return (f'<div class="grp"><h3 class="h3">{esc(title)}'
-                f'<span class="cnt">{len(gids)}</span></h3>'
-                f'<div class="items">{"".join(items)}</div></div>')
+        expanded = " open" if first_nav_id in gids else ""
+        return (f'<details class="grp"{expanded}><summary><span class="h3">{esc(title)}</span>'
+                f'<span class="cnt">{len(gids)}</span></summary>'
+                f'<div class="items">{"".join(items)}</div></details>')
 
     sections_html = []
     def add_section(title, groups):
+        groups = [(group_title, gids) for group_title, gids in groups if gids]
         if not groups:
             return
         sections_html.append(
@@ -545,25 +409,34 @@ def build(root):
     # 文档内容
     docs_html = ['<div id="ph" hidden>← 从左侧选择一个条目开始阅读</div>']
     for e in entries:
-        meta = (f'<div class="meta">📁 <span class="p">{esc(e.path)}</span>'
-                f'<div class="btns">'
-                f'<button class="btn" data-copy="{esc(e.path)}">复制路径</button>'
-                f'</div></div>')
+        meta = (f'<div class="meta"><span class="p">{esc(e.path)}</span>'
+                f'<button class="btn" data-copy="{esc(e.path)}">复制路径</button></div>')
         docs_html.append(f'<article class="doc" id="d-{e.id}" data-id="{e.id}" hidden>{meta}{e.body_html}</article>')
 
-    today = date.today().isoformat()
     return ("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-            "<title>🏠 Clinical Medicine · 离线阅读器</title>\n"
+            "<title>Clinical Medicine · 临床口袋手册</title>\n"
             "<style>" + CSS + "</style>\n</head>\n<body>\n"
             '<a class="skip-link" href="#viewer">跳转到正文</a>\n'
+            '<header id="topbar">'
+            '<button class="tool-button" id="menuToggle" aria-controls="nav" aria-expanded="false" aria-label="打开目录">☰</button>'
+            '<div class="brand"><span class="brand-mark" aria-hidden="true">CM</span>'
+            '<span><strong>Clinical Medicine</strong><small>临床学习 · 离线阅读</small></span></div>'
+            '<div class="top-current"><span class="eyebrow">正在阅读</span>'
+            '<span id="currentTitle">选择条目开始阅读</span></div>'
+            '<div class="top-actions"><button class="tool-button" id="fontDec" aria-label="缩小正文字号">A−</button>'
+            '<button class="tool-button" id="fontInc" aria-label="放大正文字号">A＋</button></div>'
+            '</header>\n<div id="workspace">'
             "<nav id=\"nav\" aria-label=\"章节导航\">"
-            "<div id=\"navH\"><h1>🏠 Clinical Medicine</h1>"
-            "<div class=\"search\"><input id=\"q\" aria-label=\"搜索考试和规培条目\" placeholder=\"🔍 病种/科室/科目/文件名…\">"
-            "<button id=\"clr\">清除</button></div><div id=\"res\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\"></div></div>"
+            '<div id="navH"><div class="nav-heading"><h2>内容目录</h2>'
+            '<button class="tool-button" id="navClose" aria-label="关闭目录">×</button></div>'
+            '<p class="nav-intro">考试备考 · 内科规培 · 项目资料</p>'
+            '<div class="search"><input id="q" aria-label="搜索考试和规培条目" placeholder="搜索病种、科室、文件…">'
+            '<button id="clr">清除</button></div><div id="res" role="status" aria-live="polite" aria-atomic="true"></div></div>'
             "<div id=\"tree\">" + "".join(sections_html) + "</div></nav>\n"
+            '<button id="shade" aria-label="关闭目录" tabindex="-1"></button>'
             f"<main id=\"viewer\" tabindex=\"-1\">{''.join(docs_html)}</main>\n"
-            '<button id="backTop">▲ 回顶</button>\n'
+            '</div><button id="backTop" aria-label="回到正文顶部">↑ 顶部</button>\n'
             "<script>" + JS + "</script>\n</body>\n</html>")
 
 
@@ -573,7 +446,7 @@ def main():
     out = os.path.join(root, OUT_NAME)
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
-    print(f"wrote: {out}  ({len(page) / 1024 / 1024:.2f} MB, {page.count('<article class=\"doc\"')} 条目)")
+    print(f"wrote: {out}  ({os.path.getsize(out) / 1024 / 1024:.2f} MiB, {page.count('<article class=\"doc\"')} 条目)")
 
 
 if __name__ == "__main__":
