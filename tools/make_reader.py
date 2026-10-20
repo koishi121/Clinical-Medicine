@@ -54,20 +54,21 @@ def redact_material_paths(src: str) -> str:
 
 
 def _mk_link(text, url, idmap, source_path):
-    u = url.strip()
+    # inline() has already escaped the whole line; decode only the URL for parsing.
+    u = _h.unescape(url.strip())
     low = u.lower()
     if low.startswith(("http://", "https://", "mailto:")):
-        return f'<a class="ext" href="{esc(u)}" target="_blank" rel="noopener">{esc(text)}</a>'
+        return f'<a class="ext" href="{esc(u)}" target="_blank" rel="noopener">{text}</a>'
     if low.startswith("#"):
-        return esc(text)
+        return text
     parsed = urlsplit(u)
     if parsed.scheme or parsed.netloc or not parsed.path:
-        return esc(text)
+        return text
     target = unquote(parsed.path)
     key = norm(posixpath.normpath(posixpath.join(posixpath.dirname(source_path), target)))
     if key in idmap:
-        return f'<a href="#" data-id="{idmap[key]}">{esc(text)}</a>'
-    return f'<span class="muted-link">{esc(text)}</span>'
+        return f'<a href="#" data-id="{idmap[key]}">{text}</a>'
+    return f'<span class="muted-link">{text}</span>'
 
 
 def inline(s, idmap, source_path):
@@ -247,23 +248,6 @@ def collect(root, idmap):
         t = title or os.path.splitext(os.path.basename(path))[0]
         return add(t, path, "<pre>" + _h.escape(src) + "</pre>")
 
-    def add_external(path, title=None, hint=""):
-        t = title or os.path.splitext(os.path.basename(path))[0]
-        ap = os.path.abspath(path).replace("\\", "/")
-        uri = "file:///" + urllib_quote(ap)
-        body = (
-            '<div class="extern">'
-            f"<h3>📄 {esc(t)}</h3><p>这是<b>独立 HTML 单文件</b>(大文件不内嵌):</p>"
-            f"<p class=\"p\">{esc(rel(root, path))}</p>"
-            '<div class="btns">'
-            f'<a class="btn" href="{uri}" target="_blank">在系统浏览器打开</a>'
-            f'<button class="btn" data-copy="{esc(rel(root, path))}">复制路径</button>'
-            "</div>"
-            f"<p class=\"hint\">{hint or '在文件资源管理器中双击该文件也可打开;影像学等 25MB 大图建议系统浏览器打开。'}</p>"
-            "</div>"
-        )
-        return add(t, path, body)
-
     # 根目录
     rp = os.path.join(root, "README.md")
     if os.path.isfile(rp):
@@ -306,11 +290,6 @@ def collect(root, idmap):
                     add_md(fp)
 
     return entries
-
-
-def urllib_quote(p):
-    from urllib.parse import quote
-    return quote(p, safe="/:")
 
 
 # ---------------- 页面骨架 ----------------
@@ -407,7 +386,7 @@ def build(root):
     add_section("🛠 工具", [("工具脚本", tool_gids)] if tool_gids else [])
 
     # 文档内容
-    docs_html = ['<div id="ph" hidden>← 从左侧选择一个条目开始阅读</div>']
+    docs_html = ['<div id="ph">目录暂时没有可阅读的条目</div>']
     for e in entries:
         meta = (f'<div class="meta"><span class="p">{esc(e.path)}</span>'
                 f'<button class="btn" data-copy="{esc(e.path)}">复制路径</button></div>')
@@ -431,7 +410,7 @@ def build(root):
             '<div id="navH"><div class="nav-heading"><h2>内容目录</h2>'
             '<button class="tool-button" id="navClose" aria-label="关闭目录">×</button></div>'
             '<p class="nav-intro">考试备考 · 内科规培 · 项目资料</p>'
-            '<div class="search"><input id="q" aria-label="搜索考试和规培条目" placeholder="搜索病种、科室、文件…">'
+            '<div class="search"><input id="q" aria-label="搜索目录条目" placeholder="搜索病种、科室、文件…">'
             '<button id="clr">清除</button></div><div id="res" role="status" aria-live="polite" aria-atomic="true"></div></div>'
             "<div id=\"tree\">" + "".join(sections_html) + "</div></nav>\n"
             '<button id="shade" aria-label="关闭目录" tabindex="-1"></button>'

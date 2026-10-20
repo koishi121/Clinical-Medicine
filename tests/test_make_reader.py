@@ -77,6 +77,16 @@ class ReaderCollectionTests(unittest.TestCase):
             self.assertNotIn("考试·备考", page)
             self.assertNotIn("规培·内科轮转", page)
             self.assertNotIn("文档·决策", page)
+            self.assertIn('<div id="ph">', page)
+
+    def test_external_link_escapes_ampersands_only_once(self):
+        rendered = make_reader.inline(
+            "[A & B](https://example.test/read?a=1&b=2)", {}, "README.md"
+        )
+
+        self.assertIn('href="https://example.test/read?a=1&amp;b=2"', rendered)
+        self.assertIn('>A &amp; B</a>', rendered)
+        self.assertNotIn('&amp;amp;', rendered)
 
     def test_build_includes_accessible_navigation_search_checkboxes_and_tables(self):
         with tempfile.TemporaryDirectory() as directory:
