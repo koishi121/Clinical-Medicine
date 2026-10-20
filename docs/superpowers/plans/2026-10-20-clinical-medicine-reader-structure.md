@@ -182,7 +182,7 @@ Verify search and clear, opening nested cards, keyboard skip navigation, active-
 
 Record the local path, one-repository boundary, project purpose, reader and clinical-training artifacts, local-only `资料/` constraint, and the verification date. Distinguish verified repository contents from plans and teaching drafts.
 
-- [ ] **Step 2: Update timeline and Git workflow notes from current repository evidence**
+- [x] **Step 2: Update timeline and Git workflow notes from current repository evidence**
 
 Replace the stale clean-tree statement with the actual archived commit/status after the project commit exists. Mention the knowledge-base directory’s Git status as observed; do not imply it is a repository if it has no `.git` directory.
 
@@ -190,10 +190,12 @@ Replace the stale clean-tree statement with the actual archived commit/status af
 
 Inspect tracked and untracked changes individually. Include only the reader work, relevant documentation, the existing 10 internal-medicine training guides and their links, and the pancreatitis-card correction already in the dirty tree. Exclude `资料/`, `.venv/`, secrets, and unrelated user files.
 
-- [ ] **Step 4: Commit the Clinical Medicine logical unit**
+- [x] **Step 4: Commit the Clinical Medicine logical unit**
 
 Stage the reviewed paths explicitly and create one descriptive commit. Preserve the prior spec commit. Do not push or change remote repository settings.
 
-- [ ] **Step 5: Verify the final repository and knowledge-base state**
+- [x] **Step 5: Verify the final repository and knowledge-base state**
+
+Final archive: Clinical Medicine local commits `f3da34f` and `f690717` follow the approved spec commit `66f000b`; `master` is clean and ahead of `origin/master` by 3 commits. No push was performed. The knowledge-base directory has no `.git`, so its updates remain local.
 
 Run the tests again, check `git status --short --branch`, inspect the commit summary and tracked file list, and confirm no `资料/` or `.venv/` paths were staged. If the knowledge-base directory is not a Git repository, leave its updated notes uncommitted and clearly report that it cannot be archived as a Git project.
