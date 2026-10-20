@@ -5,3 +5,7 @@ __pycache__/
 # 资料目录整体不入库(教材/试卷/评分标准等原始资料仅本地保存)
 资料/
 .venv/
+
+# Isolated implementation workspaces
+.worktrees/
+.superpowers/
