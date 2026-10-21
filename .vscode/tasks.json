@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "clinicalReviewBackend",
+      "type": "pickString",
+      "description": "选择审阅模型入口",
+      "options": ["codex", "opencode"],
+      "default": "codex"
+    },
+    {
+      "id": "clinicalReviewModel",
+      "type": "promptString",
+      "description": "模型 ID；留空使用该 CLI 的本机默认模型",
+      "default": ""
+    },
+    {
+      "id": "clinicalReviewPaths",
+      "type": "promptString",
+      "description": "仓库内文件路径；多文件用分号分隔",
+      "default": ""
+    },
+    {
+      "id": "clinicalReviewPrompt",
+      "type": "promptString",
+      "description": "本次只读审阅任务",
+      "default": "列出最重要的医学证据疑点，给出路径、行号和原始指南链接；没有核验的内容明确标注未核验。"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Clinical Medicine: review cards",
+      "type": "process",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\review_clinical.ps1",
+        "-Backend",
+        "${input:clinicalReviewBackend}",
+        "-Model",
+        "${input:clinicalReviewModel}",
+        "-Paths",
+        "${input:clinicalReviewPaths}",
+        "-Prompt",
+        "${input:clinicalReviewPrompt}"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

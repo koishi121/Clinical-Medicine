@@ -1,6 +1,6 @@
-# Superpowers / Runner 代理交接入口
+# Superpowers / Codex / VS Code / Runner 代理交接入口
 
-当 Codex 额度不足或需要第二模型复核时，可以通过 Runner 调用本仓库的只读代理定义 `.agents/clinical-review-opencode.md`。它用于分批审阅草稿，不自动检测额度，也不自动切换模型。每次运行由操作者明确指定任务范围；临床内容是否采纳，由主代理核对原始来源和带教意见后决定。
+本仓库使用统一审阅约定 [`clinical-review-contract.md`](clinical-review-contract.md)，Codex CLI、OpenCode、VS Code 任务和 Runner 都遵循它。通用入口是 `tools/review_clinical.ps1`；Codex CLI 与 VS Code 直接调用同一个脚本，Runner 保留独立的兼容代理定义。每次运行由操作者明确选择后端、模型和文件范围；它不自动检测额度或切换模型，临床内容是否采纳由主代理核对原始来源和带教意见后决定。
 
 本机 OpenCode 模型目录在 2026-10-21 列出 `opencode-go/deepseek-v4.1-flash`；这是本仓库默认值。目录中另有 `opencodego/deepseek-v4-flash`，但没有 `opencodego/deepseek-v4.1-flash`，因此采用实际可识别的前一个 ID。模型提供方以后若改名，先用 `opencode models` 确认，再更新代理定义。API key 只配置在本机 OpenCode 的授权/环境中，不写入仓库、交接提示或 VS Code 配置。
 
@@ -11,29 +11,34 @@
 3. 代理输出文件位置、行号、当前说法、疑点和原始指南链接；主代理复核原文、修稿、重建 HTML、运行审计并提交。
 4. 临床资料不带患者身份信息，不把草稿当作本院医嘱或处方。`source_checked` 只在完整核读且记录证据后更新。
 
-## 从 VS Code 终端接入
+## 从 VS Code 接入
 
-在 VS Code 打开此 Git 工作区后，找到已安装 Runner 插件中的 `skills/sub-agents/scripts/run_subagent.py`，先列出本仓库代理定义：
+打开 VS Code 的“终端 → 运行任务”，选择 `Clinical Medicine: review cards`，然后选择后端、模型、文件路径和本次任务。任务调用 `tools/review_clinical.ps1`，与 Codex CLI 终端使用同一个入口。
 
-Windows 上先在当前 PowerShell 终端加入 npm 命令目录，并让 JSON 中文输出使用 UTF-8：
-
-```powershell
-$env:PATH = "$env:APPDATA\npm;$env:PATH"
-$env:PYTHONIOENCODING = "utf-8"
-```
+也可以在 VS Code 终端手动调用：
 
 ```powershell
-python <RUNNER_SCRIPT> --list --cwd <CLINICAL_REPO>
+& .\tools\review_clinical.ps1 -Backend codex -Paths "考试/03_临床医学综合/消化系统/胃食管反流病.md" -Prompt "只读审阅这张卡，列出最重要的医学证据疑点和来源。"
 ```
 
-再针对一个明确的卡片批次调用：
+切换为 OpenCode 并指定模型：
 
 ```powershell
-python <RUNNER_SCRIPT> --agent clinical-review-opencode --cwd <CLINICAL_REPO> --prompt "只读审阅指定卡片：列出有来源支持的高风险问题，不修改文件。"
+& .\tools\review_clinical.ps1 -Backend opencode -Model "opencode-go/deepseek-v4.1-flash" -Paths "考试/03_临床医学综合/消化系统/胃食管反流病.md" -Prompt "只读审阅这张卡，列出最重要的医学证据疑点和来源。"
 ```
 
-`<RUNNER_SCRIPT>` 是本机插件安装路径，`<CLINICAL_REPO>` 是当前仓库或工作区的绝对路径。VS Code 后续可把同一命令放进用户级任务或项目 `.vscode/tasks.json`；这两个参数保持显式，避免把某台电脑的路径提交到公开仓库。若 Runner 无法启动，先检查 OpenCode CLI、授权及模型 ID；不要把 key 粘贴给代理或写进任务文件。
+## 从 Codex CLI 接入
+
+```powershell
+& .\tools\review_clinical.ps1 -Backend codex -Paths "考试/03_临床医学综合/消化系统/胃食管反流病.md" -Prompt "只读审阅这张卡，列出最重要的医学证据疑点和来源。"
+```
+
+可用 `-Model "模型 ID"` 覆盖当前 CLI 默认模型。Codex 使用本机 Codex CLI 登录，OpenCode 默认为 `opencode-go/deepseek-v4.1-flash`。两者的密钥都由本机 CLI 管理，不传给脚本，不写进任务文件或仓库。
+
+## 从 Runner 接入
+
+先运行 Runner 的 `--list --cwd <CLINICAL_REPO>` 查看可用定义，再用 `--agent clinical-review-opencode` 或 `--agent clinical-review-codex`。两个 Runner 定义都遵循共享审阅约定；Codex CLI profile 使用本机默认模型，OpenCode profile 使用 DeepSeek v4.1 Flash。
 
 代理运行结果只是审阅意见。若它没有读取原始指南、输出缺少路径/行号，或因额度/凭据失败，保留未核状态并由主代理继续处理。
 
-2026-10-21 已验证 Runner 能发现此代理，并让 OpenCode 2.0.32 收到一个完整的只读测试提示；这只验证接入，不算医学来源核验。本机 Runner 0.14.1 的 Windows npm 启动器需要直接调用 OpenCode 自带的 `opencode.exe` 才能保留多行提示，已对本机插件缓存作兼容修复。插件更新可能覆盖该本机修复；若更新后代理只看到 `[System Context]` 或报告找不到 `opencode`，先检查启动器，再恢复兼容修复。
+2026-10-21 曾验证 Runner 能发现 OpenCode 代理。Runner 0.14.1 的 Windows npm 启动器需要直接调用 OpenCode 自带的 `opencode.exe` 才能保留多行提示；本机缓存已有兼容修复，插件更新可能覆盖它。通用 PowerShell 入口直接调用 CLI，绕过此 Runner 启动器问题。

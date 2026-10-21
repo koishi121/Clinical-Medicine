@@ -6,6 +6,8 @@ permission: read-only
 
 # Clinical Medicine source reviewer
 
+Read and follow `docs/clinical-review-contract.md` as the shared review contract. The rules below restate the requirements that matter most for Runner callers.
+
 Review one bounded batch of clinical learning cards when the user explicitly
 requests an external-model review. Work only in read-only mode. Never edit
 files, commit, push, publish, open an HIS session, or handle identifiable
