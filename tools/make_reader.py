@@ -46,11 +46,13 @@ _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _MATERIAL_PATH_RE = re.compile(
     r"(?:[A-Za-z]:[\\/][^`<>\"'\r\n]*?资料[\\/][^`<>\"'\r\n]*|资料[\\/][^`<>\"'\r\n]*)"
 )
+_ABSOLUTE_DRIVE_PATH_RE = re.compile(r"\b[A-Za-z]:[\\/][^`<>\"'\r\n]*")
 
 
 def redact_material_paths(src: str) -> str:
-    """Hide references to local source materials in the generated reader."""
-    return _MATERIAL_PATH_RE.sub("[本地资料路径已省略]", src)
+    """Hide local source references and absolute Windows paths in the reader."""
+    src = _MATERIAL_PATH_RE.sub("[本地资料路径已省略]", src)
+    return _ABSOLUTE_DRIVE_PATH_RE.sub("[本机路径已省略]", src)
 
 
 def _mk_link(text, url, idmap, source_path):
@@ -218,8 +220,11 @@ def collect(root, idmap):
                              if f.lower().endswith(".md"))
     tools = os.path.join(root, "tools")
     if os.path.isdir(tools):
+        # The offline reader is a public learning artifact. Keep human-readable
+        # notes, but never embed executable helper scripts (which may expose
+        # local paths, source-material locations, or implementation details).
         ordered_paths.extend(os.path.join(tools, f) for f in sorted(os.listdir(tools))
-                             if f.lower().endswith((".py", ".md")))
+                             if f.lower().endswith(".md"))
     for eid, path in enumerate(ordered_paths, start=1):
         idmap[norm(rel(root, path))] = eid
 
@@ -278,16 +283,13 @@ def collect(root, idmap):
             if f.lower().endswith(".md"):
                 add_md(fp, f"📐 ADR · {f[:-3]}")
 
-    # 工具
+    # 公开阅读器仅收录工具说明，不收录可执行脚本。
     tools = os.path.join(root, "tools")
     if os.path.isdir(tools):
         for f in sorted(os.listdir(tools)):
             fp = os.path.join(tools, f)
-            if f.lower().endswith((".py", ".md")):
-                if f.lower().endswith(".py"):
-                    add_file(fp, f"🛠 {f}")
-                else:
-                    add_md(fp)
+            if f.lower().endswith(".md"):
+                add_md(fp)
 
     return entries
 
@@ -340,7 +342,7 @@ def build(root):
     ]
     # 工具
     tool_gids = [e.id for e in entries if e.path.replace("\\", "/").startswith("tools/")]
-    nav_groups = exam_groups + gp_groups + doc_groups + [("工具脚本", tool_gids)]
+    nav_groups = exam_groups + gp_groups + doc_groups + [("工具说明", tool_gids)]
     first_nav_id = next(
         (entry.id for entry in entries if entry.path == "规培/内科/消化内科/README.md"),
         next((gids[0] for _, gids in nav_groups if gids), None),
